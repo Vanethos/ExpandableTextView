@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <declare-styleable name="ExpandableTextView">
-        <attr name="ellipsizeTextResId" format="reference"/>
+        <attr name="ellipsizeReadMore" format="reference"/>
+        <attr name="ellipsizeReadLess" format="reference"/>
+        <attr name="needsReadLess" format="boolean"/>
         <attr name="ellipsizeAtLine" format="integer"/>
         <attr name="ellipsizeColor" format="reference"/>
         <attr name="underlineEllipsize" format="boolean"/>

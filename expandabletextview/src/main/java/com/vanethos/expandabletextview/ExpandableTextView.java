@@ -1,6 +1,5 @@
 package com.vanethos.expandabletextview;
 
-import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.os.Build;
@@ -24,13 +23,16 @@ import android.widget.TextView;
 public class ExpandableTextView extends AppCompatTextView {
 
     private TextView textView;
-    private int ellipsizedTextResid;
+    private int ellipsizeReadMore;
+    private int ellipsizeReadLess;
     private String ellipsizedText;
     private int ellipsizeTextColor;
     private int maxLines;
     private String expandedText;
     private ReadMoreClickableSpan readMoreClickableSpan;
     private boolean underlinedEllipsize;
+    private boolean isTextExpanded;
+    private boolean needsReadLess;
 
     public ExpandableTextView(Context context) {
         super(context);
@@ -54,10 +56,12 @@ public class ExpandableTextView extends AppCompatTextView {
             try {
                 textView = this;
                 maxLines = ta.getInteger(R.styleable.ExpandableTextView_ellipsizeAtLine, 3);
-                ellipsizedTextResid = ta.getResourceId(R.styleable.ExpandableTextView_ellipsizeTextResId, R.string.default_ellipsize_text);
+                ellipsizeReadMore = ta.getResourceId(R.styleable.ExpandableTextView_ellipsizeReadMore, R.string.ellipsize_read_more);
+                ellipsizeReadLess = ta.getResourceId(R.styleable.ExpandableTextView_ellipsizeReadLess, R.string.ellipsize_read_less);
                 ellipsizeTextColor = ta.getResourceId(R.styleable.ExpandableTextView_ellipsizeColor, R.color.default_ellipsize_color);
+                needsReadLess = ta.getBoolean(R.styleable.ExpandableTextView_needsReadLess, true);
                 underlinedEllipsize = ta.getBoolean(R.styleable.ExpandableTextView_underlineEllipsize, false);
-                ellipsizedText = textView.getContext().getResources().getString(ellipsizedTextResid);
+                ellipsizedText = textView.getContext().getResources().getString(ellipsizeReadMore);
                 readMoreClickableSpan = new ReadMoreClickableSpan();
                 getOnGlobalLayoutChangeAndEllipsize();
             } finally {
@@ -71,7 +75,7 @@ public class ExpandableTextView extends AppCompatTextView {
             @Override
             public void onGlobalLayout() {
                 expandedText = textView.getText().toString();
-                ellipsizeText();
+                toggleEllipsizeText(isTextExpanded);
                 ViewTreeObserver currentTreeObserver = textView.getViewTreeObserver();
                 if (Build.VERSION.SDK_INT < 16) {
                     currentTreeObserver.removeGlobalOnLayoutListener(this);
@@ -82,38 +86,53 @@ public class ExpandableTextView extends AppCompatTextView {
         });
     }
 
-    private void ellipsizeText() {
+    private void toggleEllipsizeText(boolean isTextExpanded) {
         textView.setMovementMethod(LinkMovementMethod.getInstance());
+        if (!isTextExpanded) {
+            contractText();
+        } else {
+            expandText();
+        }
+    }
+
+    private void contractText() {
+        String ellipsis = textView.getContext().getString(ellipsizeReadMore);
         if ((maxLines+1) <= 1) {
             int lineEndIndex = textView.getLayout().getLineEnd(0);
             String text = textView.getText()
                     .subSequence(0, lineEndIndex - ellipsizedText.length()).toString();
-            textView.setText(getClickableEllipsizeText(text));
+            textView.setText(getClickableEllipsizeText(text, ellipsis));
         } else if (textView.getLineCount() >= (maxLines+1)) {
             int lineEndIndex = textView.getLayout().getLineEnd((maxLines+1) - 1);
             int offsetEllipsizeCharacter =
-                    ellipsizedText.contains(textView.getContext().getResources().getString(R.string.default_ellipsize_text)) ? 3 : 0;
+                    ellipsizedText.contains(textView.getContext().getResources().getString(R.string.ellipsize_character)) ? 3 : 0;
             String text = textView.getText()
                     .subSequence(0, lineEndIndex - ellipsizedText.length() - offsetEllipsizeCharacter).toString();
-            textView.setText(getClickableEllipsizeText(text));
+            textView.setText(getClickableEllipsizeText(text, ellipsis));
         }
     }
 
     private void expandText() {
-        textView.setText(expandedText);
+        if (!needsReadLess) {
+            textView.setText(expandedText);
+        } else {
+            String ellipsis = textView.getContext().getString(ellipsizeReadLess);
+            textView.setText(getClickableEllipsizeText(expandedText, ellipsis));
+        }
     }
 
-    private CharSequence getClickableEllipsizeText (String text) {
+    private CharSequence getClickableEllipsizeText (String text, String ellipsis) {
         SpannableStringBuilder spannableText = new SpannableStringBuilder(text, 0, text.length())
-                .append(ellipsizedText);
-        spannableText.setSpan(readMoreClickableSpan, spannableText.length() - ellipsizedText.length(), spannableText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                .append(ellipsis);
+        spannableText.setSpan(readMoreClickableSpan, spannableText.length() - ellipsis.length(), spannableText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return spannableText;
     }
 
     private class ReadMoreClickableSpan extends ClickableSpan {
         @Override
         public void onClick(View widget) {
-            expandText();
+            isTextExpanded = !isTextExpanded;
+            toggleEllipsizeText(isTextExpanded);
         }
 
         @Override

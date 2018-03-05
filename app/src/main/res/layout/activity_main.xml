@@ -13,10 +13,7 @@
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         android:text="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi mattis condimentum odio id facilisis.\nMauris semper leo a aliquet laoreet. Nunc tincidunt ultrices orci, sollicitudin rhoncus lacus tincidunt non. Vivamus molestie finibus tortor, ac blandit tellus gravida finibus. Pellentesque cursus lorem a consequat condimentum. Sed vel ligula feugiat, posuere lorem vitae, dignissim massa. Vestibulum non diam quis diam laoreet rhoncus. Sed vel ante ac dui rutrum convallis. Sed tempor ante vel consectetur consectetur. Pellentesque ut sem ac mauris sagittis ullamcorper nec non sem. Morbi tincidunt consectetur varius. In hac habitasse platea dictumst. Ut orci odio, iaculis at porta in, tempus nec libero. "
-        app:ellipsizeAtLine="4"
-        app:ellipsizeColor="@color/colorAccent"
-        app:underlineEllipsize="true"
-        app:ellipsizeTextResId="@string/ellipsize"
+
         />
 
 </android.support.constraint.ConstraintLayout>

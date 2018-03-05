@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Example</string>
-    <string name="ellipsize">…more</string>
+    <string name="ellipsize_read_more">…read more</string>
+    <string name="ellipsize_read_less">…less is more</string>
 </resources>
