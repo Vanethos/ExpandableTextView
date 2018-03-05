@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">ExpandableTextView</string>
+    <string name="default_ellipsize_text">…</string>
+</resources>
