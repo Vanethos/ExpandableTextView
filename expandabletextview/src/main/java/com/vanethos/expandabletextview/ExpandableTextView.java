@@ -2,13 +2,17 @@ package com.vanethos.expandabletextview;
 
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.graphics.Paint;
+import android.graphics.Rect;
 import android.os.Build;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.widget.AppCompatTextView;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.TextPaint;
+import android.text.TextUtils;
 import android.text.method.LinkMovementMethod;
 import android.text.style.ClickableSpan;
 import android.util.AttributeSet;
@@ -21,11 +25,9 @@ import android.widget.TextView;
  */
 
 public class ExpandableTextView extends AppCompatTextView {
-
     private TextView textView;
-    private int ellipsizeReadMore;
-    private int ellipsizeReadLess;
-    private String ellipsizedText;
+    private String readMoreLabel;
+    private String readLessLabel;
     private int ellipsizeTextColor;
     private int maxLines;
     private String expandedText;
@@ -33,6 +35,11 @@ public class ExpandableTextView extends AppCompatTextView {
     private boolean underlinedEllipsize;
     private boolean isTextExpanded;
     private boolean needsReadLess;
+    private String contractedString;
+
+    private float MAX_WIDTH_PERCENTAGE = 0.9f;
+    private float screenWidth;
+
 
     public ExpandableTextView(Context context) {
         super(context);
@@ -50,18 +57,17 @@ public class ExpandableTextView extends AppCompatTextView {
     }
 
     protected void init(@NonNull Context context, @Nullable AttributeSet attrs, int defStyleAttr) {
-
         if (attrs != null) {
             TypedArray ta = context.obtainStyledAttributes(attrs, R.styleable.ExpandableTextView, defStyleAttr, 0);
             try {
                 textView = this;
-                maxLines = ta.getInteger(R.styleable.ExpandableTextView_ellipsizeAtLine, 3);
-                ellipsizeReadMore = ta.getResourceId(R.styleable.ExpandableTextView_ellipsizeReadMore, R.string.ellipsize_read_more);
-                ellipsizeReadLess = ta.getResourceId(R.styleable.ExpandableTextView_ellipsizeReadLess, R.string.ellipsize_read_less);
-                ellipsizeTextColor = ta.getResourceId(R.styleable.ExpandableTextView_ellipsizeColor, R.color.default_ellipsize_color);
+                textView.setMaxLines(Integer.MAX_VALUE); // default value for TextView's maxLines attribute
+                maxLines = attrs.getAttributeIntValue("http://schemas.android.com/apk/res/android", "maxLines", 3);
+                readMoreLabel = getIntOrStringResource(ta, R.styleable.ExpandableTextView_readMoreLabel, R.string.ellipsize_read_more);
+                readLessLabel = getIntOrStringResource(ta, R.styleable.ExpandableTextView_readLessLabel, R.string.ellipsize_read_less);
+                ellipsizeTextColor = getIntOrColorResource(ta,R.styleable.ExpandableTextView_ellipsizeColor, R.color.default_ellipsize_color);
                 needsReadLess = ta.getBoolean(R.styleable.ExpandableTextView_needsReadLess, true);
                 underlinedEllipsize = ta.getBoolean(R.styleable.ExpandableTextView_underlineEllipsize, false);
-                ellipsizedText = textView.getContext().getResources().getString(ellipsizeReadMore);
                 readMoreClickableSpan = new ReadMoreClickableSpan();
                 getOnGlobalLayoutChangeAndEllipsize();
             } finally {
@@ -75,6 +81,7 @@ public class ExpandableTextView extends AppCompatTextView {
             @Override
             public void onGlobalLayout() {
                 expandedText = textView.getText().toString();
+                screenWidth = textView.getLayout().getWidth();
                 toggleEllipsizeText(isTextExpanded);
                 ViewTreeObserver currentTreeObserver = textView.getViewTreeObserver();
                 if (Build.VERSION.SDK_INT < 16) {
@@ -96,38 +103,86 @@ public class ExpandableTextView extends AppCompatTextView {
     }
 
     private void contractText() {
-        String ellipsis = textView.getContext().getString(ellipsizeReadMore);
-        if ((maxLines+1) <= 1) {
-            int lineEndIndex = textView.getLayout().getLineEnd(0);
-            String text = textView.getText()
-                    .subSequence(0, lineEndIndex - ellipsizedText.length()).toString();
-            textView.setText(getClickableEllipsizeText(text, ellipsis));
-        } else if (textView.getLineCount() >= (maxLines+1)) {
-            int lineEndIndex = textView.getLayout().getLineEnd((maxLines+1) - 1);
-            int offsetEllipsizeCharacter =
-                    ellipsizedText.contains(textView.getContext().getResources().getString(R.string.ellipsize_character)) ? 3 : 0;
-            String text = textView.getText()
-                    .subSequence(0, lineEndIndex - ellipsizedText.length() - offsetEllipsizeCharacter).toString();
-            textView.setText(getClickableEllipsizeText(text, ellipsis));
-        }
+        int line = (maxLines+1) <= 1 ? 0 : maxLines - 1;
+        if (TextUtils.isEmpty(contractedString)) contractedString = getContractedString(line);
+        textView.setText(getClickableEllipsizeText(contractedString, readMoreLabel));
     }
 
     private void expandText() {
         if (!needsReadLess) {
             textView.setText(expandedText);
         } else {
-            String ellipsis = textView.getContext().getString(ellipsizeReadLess);
-            textView.setText(getClickableEllipsizeText(expandedText, ellipsis));
+            textView.setText(getClickableEllipsizeText(expandedText, readLessLabel));
         }
     }
 
     private CharSequence getClickableEllipsizeText (String text, String ellipsis) {
-        SpannableStringBuilder spannableText = new SpannableStringBuilder(text, 0, text.length())
+        SpannableStringBuilder spannable = new SpannableStringBuilder();
+        spannable.append(text)
+                .append(" ")
                 .append(ellipsis);
-        spannableText.setSpan(readMoreClickableSpan, spannableText.length() - ellipsis.length(), spannableText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        return spannableText;
+        spannable.setSpan(readMoreClickableSpan, spannable.length() - ellipsis.length(), spannable.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return spannable;
     }
 
+    private String getContractedString(int line) {
+        int originalLineEndIndex = textView.getLayout().getLineVisibleEnd(line);
+        int lineEndIndex = getLineEndIndex(line, originalLineEndIndex);
+        if (
+                originalLineEndIndex == lineEndIndex &&
+                        getStringWidth(readLessLabel) + textView.getLayout().getLineWidth(line) < MAX_WIDTH_PERCENTAGE * screenWidth
+                ) {
+            return textView.getText()
+                    .subSequence(0, lineEndIndex).toString();
+        }
+        return textView.getText()
+                .subSequence(0, lineEndIndex - (readMoreLabel.length() + 1)).toString();
+    }
+
+    private int getLineEndIndex(int line, int originalEndLineIndex) {
+        if (textView.getLayout().getLineWidth(line) >= MAX_WIDTH_PERCENTAGE * screenWidth) {
+            return originalEndLineIndex -
+                    getLastWordLength(
+                            textView.getText().toString().substring(0, originalEndLineIndex)
+                    );
+        } else {
+            return originalEndLineIndex;
+        }
+    }
+
+    //region Utils
+    private int getIntOrColorResource(TypedArray ta, int typedArrayIndex, int defaultResIdValue) {
+        return ta.getResourceId(typedArrayIndex, -1) == -1 ?
+                ta.getColor(typedArrayIndex, getResourceColor(defaultResIdValue)) :
+                getResourceColor(ta.getResourceId(typedArrayIndex, defaultResIdValue));
+    }
+
+    private String getIntOrStringResource(TypedArray ta, int typedArrayIndex, int defaultResIdValue) {
+        return ta.getString(typedArrayIndex) == null ?
+                getResourceString(ta.getResourceId(typedArrayIndex, defaultResIdValue)) : ta.getString(typedArrayIndex);
+    }
+
+    private String getResourceString(int id) {
+        return getResources().getString(id);
+    }
+
+    private int getResourceColor(int id) {
+        return ContextCompat.getColor(getContext(), id);
+    }
+
+    private int getLastWordLength(String text) {
+        return text.substring(text.lastIndexOf(" "), text.length() - 1).length();
+    }
+
+    private int getStringWidth(String text) {
+        Rect bounds = new Rect();
+        Paint textPaint = textView.getPaint();
+        textPaint.getTextBounds(text, 0, text.length(), bounds);
+        return bounds.width();
+    }
+    //endregion
+
+    //region ClickableSpan styling
     private class ReadMoreClickableSpan extends ClickableSpan {
         @Override
         public void onClick(View widget) {
@@ -137,8 +192,9 @@ public class ExpandableTextView extends AppCompatTextView {
 
         @Override
         public void updateDrawState(TextPaint ds) {
-            ds.setColor(getResources().getColor(ellipsizeTextColor));
+            ds.setColor(ellipsizeTextColor);
             ds.setUnderlineText(underlinedEllipsize);
         }
     }
+    //endregion
 }
