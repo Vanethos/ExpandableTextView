@@ -18,8 +18,7 @@
         app:readLessLabel="bananas"
         app:readMoreLabel="manga"
         app:ellipsizeColor="#470"
-        android:maxLines="1"
-
+        android:maxLines="3"
         />
 
 </android.support.constraint.ConstraintLayout>
